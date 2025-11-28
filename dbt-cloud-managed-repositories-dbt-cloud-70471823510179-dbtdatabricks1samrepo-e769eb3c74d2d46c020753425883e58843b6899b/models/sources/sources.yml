@@ -1,0 +1,9 @@
+version: 2
+
+sources:
+  - name: crypto_bronze
+    database: crypto_catalog
+    schema: bronze
+    tables:
+      - name: crypto_prices_data
+        description: "raw streaming data from coingecko api ingested through autoloader to bronze table"
