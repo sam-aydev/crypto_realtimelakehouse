@@ -1,0 +1,19 @@
+{
+	"name": "iotdatabricks",
+	"properties": {
+		"annotations": [],
+		"type": "AzureDatabricks",
+		"typeProperties": {
+			"domain": "https://adb-4402880943667997.17.azuredatabricks.net",
+			"accessToken": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "databricksvault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "databricksconn"
+			},
+			"existingClusterId": "1130-014944-13xgg3aa"
+		}
+	}
+}
