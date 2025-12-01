@@ -1,0 +1,28 @@
+{
+	"name": "orchestrate pipeline",
+	"properties": {
+		"activities": [
+			{
+				"name": "bronze ingestion",
+				"type": "DatabricksNotebook",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"notebookPath": "/Users/samaydev@atomicmail.io/azureIotdataengineeringpipeline/IoT Data Ingestion"
+				},
+				"linkedServiceName": {
+					"referenceName": "iotdatabricks",
+					"type": "LinkedServiceReference"
+				}
+			}
+		],
+		"annotations": []
+	}
+}
