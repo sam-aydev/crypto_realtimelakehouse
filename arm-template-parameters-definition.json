@@ -1,0 +1,317 @@
+{
+  "name": "Modern Azure Data Engineering Pipeline with ADF",
+  "description": "Complete medallion architecture orchestration",
+  
+  "pipelines": [
+    {
+      "name": "Master_IoT_Pipeline",
+      "description": "Orchestrates the entire Bronze → Silver → Gold flow",
+      "activities": [
+        {
+          "name": "Trigger_Bronze_Stream",
+          "type": "DatabricksNotebook",
+          "description": "Start Bronze streaming ingestion",
+          "dependsOn": [],
+          "policy": {
+            "timeout": "0.00:10:00",
+            "retry": 2,
+            "retryIntervalInSeconds": 30
+          },
+          "typeProperties": {
+            "notebookPath": "/Workspace/notebooks/bronze_streaming",
+            "baseParameters": {
+              "storage_account": "@pipeline().parameters.storageAccount"
+            }
+          },
+          "linkedServiceName": {
+            "referenceName": "AzureDatabricks_LinkedService",
+            "type": "LinkedServiceReference"
+          }
+        },
+        {
+          "name": "Wait_For_Bronze_Data",
+          "type": "Wait",
+          "description": "Wait for Bronze to accumulate data",
+          "dependsOn": [
+            {
+              "activity": "Trigger_Bronze_Stream",
+              "dependencyConditions": ["Succeeded"]
+            }
+          ],
+          "typeProperties": {
+            "waitTimeInSeconds": 60
+          }
+        },
+        {
+          "name": "Run_dbt_Silver",
+          "type": "DatabricksNotebook",
+          "description": "Execute dbt for Silver transformation",
+          "dependsOn": [
+            {
+              "activity": "Wait_For_Bronze_Data",
+              "dependencyConditions": ["Succeeded"]
+            }
+          ],
+          "policy": {
+            "timeout": "0.00:30:00",
+            "retry": 2
+          },
+          "typeProperties": {
+            "notebookPath": "/Workspace/notebooks/run_dbt",
+            "baseParameters": {
+              "dbt_command": "dbt run --select silver",
+              "project_dir": "/Workspace/dbt-project"
+            }
+          },
+          "linkedServiceName": {
+            "referenceName": "AzureDatabricks_LinkedService",
+            "type": "LinkedServiceReference"
+          }
+        },
+        {
+          "name": "Run_dbt_Gold",
+          "type": "DatabricksNotebook",
+          "description": "Execute dbt for Gold layer",
+          "dependsOn": [
+            {
+              "activity": "Run_dbt_Silver",
+              "dependencyConditions": ["Succeeded"]
+            }
+          ],
+          "policy": {
+            "timeout": "0.00:45:00",
+            "retry": 2
+          },
+          "typeProperties": {
+            "notebookPath": "/Workspace/notebooks/run_dbt",
+            "baseParameters": {
+              "dbt_command": "dbt run --select gold",
+              "project_dir": "/Workspace/dbt-project"
+            }
+          },
+          "linkedServiceName": {
+            "referenceName": "AzureDatabricks_LinkedService",
+            "type": "LinkedServiceReference"
+          }
+        },
+        {
+          "name": "Run_Data_Quality_Tests",
+          "type": "DatabricksNotebook",
+          "description": "Run dbt tests for data quality",
+          "dependsOn": [
+            {
+              "activity": "Run_dbt_Gold",
+              "dependencyConditions": ["Succeeded"]
+            }
+          ],
+          "typeProperties": {
+            "notebookPath": "/Workspace/notebooks/run_dbt",
+            "baseParameters": {
+              "dbt_command": "dbt test",
+              "project_dir": "/Workspace/dbt-project"
+            }
+          },
+          "linkedServiceName": {
+            "referenceName": "AzureDatabricks_LinkedService",
+            "type": "LinkedServiceReference"
+          }
+        },
+        {
+          "name": "Send_Success_Notification",
+          "type": "WebActivity",
+          "description": "Send email on success",
+          "dependsOn": [
+            {
+              "activity": "Run_Data_Quality_Tests",
+              "dependencyConditions": ["Succeeded"]
+            }
+          ],
+          "typeProperties": {
+            "url": "@pipeline().parameters.notificationWebhook",
+            "method": "POST",
+            "body": {
+              "message": "IoT Pipeline completed successfully",
+              "timestamp": "@utcnow()",
+              "silver_records": "@activity('Run_dbt_Silver').output.recordCount",
+              "gold_records": "@activity('Run_dbt_Gold').output.recordCount"
+            }
+          }
+        }
+      ],
+      "parameters": {
+        "storageAccount": {
+          "type": "string",
+          "defaultValue": "yourstorageaccount"
+        },
+        "notificationWebhook": {
+          "type": "string"
+        }
+      },
+      "annotations": ["IoT", "Medallion", "Production"]
+    },
+    
+    {
+      "name": "Alternative_Copy_Based_Pipeline",
+      "description": "Traditional ADF Copy activities (if not using dbt location_root)",
+      "activities": [
+        {
+          "name": "Copy_Bronze_to_Silver_Container",
+          "type": "Copy",
+          "description": "Copy processed data to Silver ADLS",
+          "dependsOn": [],
+          "policy": {
+            "timeout": "0.00:30:00",
+            "retry": 3
+          },
+          "typeProperties": {
+            "source": {
+              "type": "DelimitedTextSource",
+              "storeSettings": {
+                "type": "AzureBlobFSReadSettings",
+                "recursive": true,
+                "wildcardFileName": "*.parquet"
+              },
+              "formatSettings": {
+                "type": "ParquetReadSettings"
+              }
+            },
+            "sink": {
+              "type": "ParquetSink",
+              "storeSettings": {
+                "type": "AzureBlobFSWriteSettings"
+              }
+            },
+            "enableStaging": false,
+            "parallelCopies": 4,
+            "dataIntegrationUnits": 16
+          },
+          "inputs": [
+            {
+              "referenceName": "Dataset_Databricks_Silver_Output",
+              "type": "DatasetReference"
+            }
+          ],
+          "outputs": [
+            {
+              "referenceName": "Dataset_ADLS_Silver_Container",
+              "type": "DatasetReference"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  
+  "triggers": [
+    {
+      "name": "Schedule_Trigger_Every_15_Minutes",
+      "type": "ScheduleTrigger",
+      "typeProperties": {
+        "recurrence": {
+          "frequency": "Minute",
+          "interval": 15,
+          "startTime": "2024-01-01T00:00:00Z",
+          "timeZone": "UTC"
+        }
+      },
+      "pipelines": [
+        {
+          "pipelineReference": {
+            "referenceName": "Master_IoT_Pipeline",
+            "type": "PipelineReference"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tumbling_Window_Trigger_Hourly",
+      "type": "TumblingWindowTrigger",
+      "typeProperties": {
+        "frequency": "Hour",
+        "interval": 1,
+        "startTime": "2024-01-01T00:00:00Z",
+        "maxConcurrency": 1,
+        "retryPolicy": {
+          "count": 3,
+          "intervalInSeconds": 300
+        }
+      },
+      "pipeline": {
+        "pipelineReference": {
+          "referenceName": "Master_IoT_Pipeline",
+          "type": "PipelineReference"
+        }
+      }
+    }
+  ],
+  
+  "linkedServices": [
+    {
+      "name": "AzureDatabricks_LinkedService",
+      "type": "AzureDatabricks",
+      "typeProperties": {
+        "domain": "https://your-workspace.azuredatabricks.net",
+        "authentication": "MSI",
+        "workspaceResourceId": "/subscriptions/{subscription-id}/resourceGroups/{rg}/providers/Microsoft.Databricks/workspaces/{workspace}",
+        "existingClusterId": "{cluster-id}"
+      }
+    },
+    {
+      "name": "ADLS_Gen2_LinkedService",
+      "type": "AzureBlobFS",
+      "typeProperties": {
+        "url": "https://yourstorageaccount.dfs.core.windows.net",
+        "authentication": "MSI"
+      }
+    }
+  ],
+  
+  "datasets": [
+    {
+      "name": "Dataset_Bronze_Container",
+      "type": "Parquet",
+      "linkedServiceName": {
+        "referenceName": "ADLS_Gen2_LinkedService",
+        "type": "LinkedServiceReference"
+      },
+      "typeProperties": {
+        "location": {
+          "type": "AzureBlobFSLocation",
+          "fileName": "*.parquet",
+          "folderPath": "delta/iot_data",
+          "fileSystem": "bronze"
+        }
+      }
+    },
+    {
+      "name": "Dataset_Silver_Container",
+      "type": "Parquet",
+      "linkedServiceName": {
+        "referenceName": "ADLS_Gen2_LinkedService",
+        "type": "LinkedServiceReference"
+      },
+      "typeProperties": {
+        "location": {
+          "type": "AzureBlobFSLocation",
+          "folderPath": "delta/iot_data",
+          "fileSystem": "silver"
+        }
+      }
+    },
+    {
+      "name": "Dataset_Gold_Container",
+      "type": "Parquet",
+      "linkedServiceName": {
+        "referenceName": "ADLS_Gen2_LinkedService",
+        "type": "LinkedServiceReference"
+      },
+      "typeProperties": {
+        "location": {
+          "type": "AzureBlobFSLocation",
+          "folderPath": "delta",
+          "fileSystem": "gold"
+        }
+      }
+    }
+  ]
+}
