@@ -1,0 +1,10 @@
+{
+	"name": "databricksvault",
+	"properties": {
+		"annotations": [],
+		"type": "AzureKeyVault",
+		"typeProperties": {
+			"baseUrl": "https://iotsamkeyvault.vault.azure.net/"
+		}
+	}
+}
