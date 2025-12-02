@@ -3,12 +3,12 @@
 	"properties": {
 		"activities": [
 			{
-				"name": "bronze ingestion",
+				"name": "ingestion to bronze adls container",
 				"type": "DatabricksNotebook",
 				"dependsOn": [],
 				"policy": {
-					"timeout": "0.12:00:00",
-					"retry": 0,
+					"timeout": "0.00:10:00",
+					"retry": 1,
 					"retryIntervalInSeconds": 30,
 					"secureOutput": false,
 					"secureInput": false
@@ -20,6 +20,93 @@
 				"linkedServiceName": {
 					"referenceName": "iotdatabricks",
 					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "wait 3s after ingestion",
+				"type": "Wait",
+				"dependsOn": [
+					{
+						"activity": "ingestion to bronze adls container",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"waitTimeInSeconds": 3
+				}
+			},
+			{
+				"name": "from container to bronze delta table",
+				"type": "DatabricksNotebook",
+				"dependsOn": [
+					{
+						"activity": "wait 3s after ingestion",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 1,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"notebookPath": "/Users/samaydev@atomicmail.io/azureIotdataengineeringpipeline/bronze layer"
+				},
+				"linkedServiceName": {
+					"referenceName": "iotdatabricks",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "goldandsilver to ADLS",
+				"type": "DatabricksNotebook",
+				"dependsOn": [
+					{
+						"activity": "Wait for 5 mins",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"notebookPath": "/Users/samaydev@atomicmail.io/gold and silver to adls"
+				},
+				"linkedServiceName": {
+					"referenceName": "iotdatabricks",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "Wait for 5 mins",
+				"description": "dbt has be scheduled for 10 mins interval through it orchestrator",
+				"type": "Wait",
+				"dependsOn": [
+					{
+						"activity": "from container to bronze delta table",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"waitTimeInSeconds": 360
 				}
 			}
 		],

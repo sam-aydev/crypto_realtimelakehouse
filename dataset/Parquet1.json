@@ -1,0 +1,76 @@
+{
+	"name": "Parquet1",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "storageiotgen2",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "Parquet",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileSystem": "gold"
+			},
+			"compressionCodec": "snappy"
+		},
+		"schema": [
+			{
+				"name": "deviceId",
+				"type": "UTF8"
+			},
+			{
+				"name": "hour",
+				"type": "INT96"
+			},
+			{
+				"name": "date",
+				"type": "DATE"
+			},
+			{
+				"name": "record_count",
+				"type": "INT_64"
+			},
+			{
+				"name": "avg_temperature",
+				"type": "DOUBLE"
+			},
+			{
+				"name": "min_temperature",
+				"type": "DOUBLE"
+			},
+			{
+				"name": "max_temperature",
+				"type": "DOUBLE"
+			},
+			{
+				"name": "stddev_temperature",
+				"type": "DOUBLE"
+			},
+			{
+				"name": "avg_humidity",
+				"type": "DOUBLE"
+			},
+			{
+				"name": "avg_pressure",
+				"type": "DOUBLE"
+			},
+			{
+				"name": "warning_count",
+				"type": "INT_64"
+			},
+			{
+				"name": "critical_count",
+				"type": "INT_64"
+			},
+			{
+				"name": "last_updated",
+				"type": "INT96"
+			},
+			{
+				"name": "device_hour_key",
+				"type": "UTF8"
+			}
+		]
+	}
+}

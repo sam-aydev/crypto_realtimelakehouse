@@ -1,0 +1,19 @@
+{
+	"name": "check_parquet",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "storageiotgen2",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "Parquet",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileSystem": "silver"
+			},
+			"compressionCodec": "snappy"
+		},
+		"schema": []
+	}
+}
